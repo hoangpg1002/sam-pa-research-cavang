@@ -262,29 +262,23 @@ class DualImageEncoderViT(ImageEncoderViT):
                            'vit_h':"pretrained_checkpoint/sam_vit_h_maskdecoder.pth"}
         checkpoint_path = checkpoint_dict[model_type]
         self.load_state_dict(torch.load(checkpoint_path),strict=False)
-        print("Dual Image Encoder init from SAM ImageEncoder")
-        for name, param in self.named_parameters():
-            if 'cross_branch_adapter' in name:
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-        self.feature_extractor=FeatureExtractor()
-        self.cross_branch_adapter=CrossBranchAdapter()
+        #self.feature_extractor=FeatureExtractor()
+        #self.cross_branch_adapter=CrossBranchAdapter()
         if is_train==True:
             self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_5encoder.pth"))
             print("encoder load pretrained!")
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-            add_features=self.feature_extractor(x)
+            #add_features=self.feature_extractor(x)
             x = self.patch_embed(x) #(1,64,64,768)
             if self.pos_embed is not None:
                 x = x + self.pos_embed
 
             interm_embeddings=[]
             for blk in self.blocks:
-                x = blk(x,add_features)
+                x = blk(x)
                 if blk.window_size == 0:
                     interm_embeddings.append(x)
-            x=self.cross_branch_adapter(x,add_features)
+            #x=self.cross_branch_adapter(x,add_features)
             x = self.neck(x.permute(0, 3, 1, 2))
             return x, interm_embeddings
 
