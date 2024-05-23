@@ -262,6 +262,9 @@ class DualImageEncoderViT(ImageEncoderViT):
                            'vit_h':"pretrained_checkpoint/sam_vit_h_maskdecoder.pth"}
         checkpoint_path = checkpoint_dict[model_type]
         self.load_state_dict(torch.load(checkpoint_path),strict=False)
+        print("Dual Image Encoder init from SAM ImageEncoder")
+        for name, param in self.named_parameters():
+            param.requires_grad = False
         #self.feature_extractor=FeatureExtractor()
         #self.cross_branch_adapter=CrossBranchAdapter()
         if is_train==True:
