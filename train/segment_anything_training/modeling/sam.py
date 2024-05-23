@@ -133,6 +133,7 @@ class Sam(nn.Module):
                     "image_pe": self.prompt_encoder.get_dense_pe(),
                     "sparse_embeddings":sparse_embeddings,
                     "dense_embeddings":dense_embeddings,
+                    "input_images":input_images
                 }
             )
 
@@ -180,3 +181,4 @@ class Sam(nn.Module):
         padw = self.image_encoder.img_size - w
         x = F.pad(x, (0, padw, 0, padh))
         return x
+    

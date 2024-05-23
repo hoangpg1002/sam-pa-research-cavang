@@ -11,6 +11,7 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 from torch.autograd import Variable
 import matplotlib.pyplot as plt
 import cv2
@@ -19,7 +20,7 @@ from typing import Dict, List, Tuple
 from segment_anything_training import sam_model_registry
 from segment_anything_training.modeling import TwoWayTransformer, MaskDecoder,ImageEncoderViT
 from utils.dataloader import get_im_gt_name_dict, create_dataloaders, RandomHFlip, Resize, LargeScaleJitter
-from utils.loss_mask import loss_masks
+from utils.loss_mask import loss_masks,loss_masks_whole, loss_masks_whole_uncertain
 import utils.misc as misc
 import sys
 
@@ -35,7 +36,7 @@ import torch.nn.functional as F
 
 from typing import Optional, Tuple, Type
 from efficientnet_pytorch import EfficientNet
-
+from segment_anything_training.modeling.transformer import Attention
 from segment_anything_training.modeling.common import LayerNorm2d, MLPBlock
 def seed_everything(seed: int):
     import random, os
@@ -288,7 +289,70 @@ class DualImageEncoderViT(ImageEncoderViT):
 
 
 #==============================================
+class PromptAdapater(nn.Module):
+    """
+    An prompt adapter layer that can adjust prompt tokens. B means predict the same image for B times with different prompts. B is 1 in the training phase.
+    """
 
+    def __init__(
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        downsample_rate: int = 1,
+        box_head_hidden_dim: int = 256,
+        attention_downsample_rate: int = 2,
+    ) -> None:
+        super().__init__()
+        self.static_uncertain_token = nn.Embedding(1, embedding_dim)
+        self.static_refined_token = nn.Embedding(1, embedding_dim)
+        self.uncertain_mlp = MLP(embedding_dim*2, embedding_dim // 4, embedding_dim, 3)
+        self.refined_mlp = MLP(embedding_dim*2, embedding_dim // 4, embedding_dim, 3)
+
+        self.cross_attn_token_to_image = Attention(
+            embedding_dim, num_heads, downsample_rate=attention_downsample_rate
+        )
+
+
+    def forward(
+        self, queries: Tensor, keys: Tensor, query_pe: Tensor, key_pe: Tensor, prompt_encoder, guiding_embedding
+    ) -> Tuple[Tensor, Tensor]:
+
+        # guiding embedding generation
+        b, c, h, w = guiding_embedding.shape
+        input_image_size = prompt_encoder.input_image_size
+        ori_h, ori_w = input_image_size
+        guiding_embedding = guiding_embedding.flatten(2).permute(0, 2, 1)
+        attn_out = guiding_embedding * keys
+        guiding_embedding = attn_out
+
+        # token to image cross attention
+        attn_out, v_refined = self.cross_attn_token_to_image.forward_return_v(q=queries+query_pe, k=guiding_embedding+key_pe, v=guiding_embedding)
+        queries = attn_out
+
+        # generating uncertain token and refined token
+        uncertain_token = torch.cat([self.static_uncertain_token.weight.repeat(b,1), queries[:,1,:]], dim=-1)
+        uncertain_token = self.uncertain_mlp(uncertain_token).unsqueeze(1)
+        refined_token = torch.cat([self.static_refined_token.weight.repeat(b,1), queries[:,1,:]], dim=-1)
+        refined_token = self.refined_mlp(refined_token).unsqueeze(1)
+
+        # obtain mask by U*R+(1-U)*M  (return uncertain map and mask for loss calculation)
+        output_uncertain_token = uncertain_token
+        output_refined_token = refined_token
+        image_embedding = guiding_embedding.transpose(1, 2)
+        unceratinty_map = (output_uncertain_token @ image_embedding).view(b, 1, 64, 64)
+        unceratinty_map_norm = torch.sigmoid(unceratinty_map)
+
+
+        refined_mask = (output_refined_token @ image_embedding).view(b, 1, 64, 64)
+        coarse_mask = (queries[:,1,:] @ image_embedding).view(b, 1, 64, 64)
+        final_mask = (unceratinty_map_norm>=0.5).detach()*refined_mask + (unceratinty_map_norm<0.5).detach()*coarse_mask
+        mask = {"unceratinty_map": unceratinty_map_norm, 
+                      "refined_mask": refined_mask,
+                      "coarse_mask": coarse_mask, 
+                      "final_mask": final_mask}
+        return mask
+
+#============================================
 class LayerNorm2d(nn.Module):
     def __init__(self, num_channels: int, eps: float = 1e-6) -> None:
         super().__init__()
@@ -379,6 +443,17 @@ class MaskDecoderHQ(MaskDecoder):
         if is_train==True:
             self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_5decoder.pth"))
             print("decoder load pretrained!")
+        self.guiding_conv = nn.Sequential(
+            nn.Conv2d(4, transformer_dim // 4, kernel_size=2, stride=2),
+            LayerNorm2d(transformer_dim // 4),
+            nn.GELU(),
+            nn.Conv2d(transformer_dim // 4, transformer_dim, kernel_size=2, stride=2),
+            LayerNorm2d(transformer_dim),
+            nn.GELU(),
+            nn.Conv2d(transformer_dim, transformer_dim, kernel_size=1),
+        )
+        #-----------------------prompt adapter-------------------------------
+        self.prompt_adapter = PromptAdapater(transformer_dim,self.transformer.num_heads)
 
     def forward(
         self,
@@ -389,6 +464,8 @@ class MaskDecoderHQ(MaskDecoder):
         multimask_output: bool,
         hq_token_only: bool,
         interm_embeddings: torch.Tensor,
+        input_images,
+        prompt_encoder
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Predict masks given image and prompt embeddings.
@@ -407,20 +484,45 @@ class MaskDecoderHQ(MaskDecoder):
 
         vit_features = interm_embeddings[0].permute(0, 3, 1, 2) #interm_embeddings[0] =(1,64,64,768) => (1,768,64,64)
         hq_features=self.embedding_encoder(image_embeddings)+self.compress_vit_feat(vit_features)
+        input_images = F.interpolate(
+            input_images,
+            (256,256),
+            mode="bilinear",
+            align_corners=False,
+        )
         batch_len = len(image_embeddings)
         masks = []
         iou_preds = []
+        uncertain_maps = []
+        final_masks = []
+        coarse_masks = []
+        refined_masks = []
         for i_batch in range(batch_len):
-            mask, iou_pred = self.predict_masks(
+            image_grad = misc.generalized_image_grad(input_images[i_batch]).unsqueeze(0)/255
+            image_with_grad = torch.cat((input_images[i_batch], image_grad), dim=0)
+            guiding_embedding = self.guiding_conv(image_with_grad.unsqueeze(0))
+
+            mask, iou_pred,interm_result = self.predict_masks(
                 image_embeddings=image_embeddings[i_batch].unsqueeze(0),
                 image_pe=image_pe[i_batch],
                 sparse_prompt_embeddings=sparse_prompt_embeddings[i_batch],
                 dense_prompt_embeddings=dense_prompt_embeddings[i_batch],
-                hq_feature = hq_features[i_batch].unsqueeze(0)
+                hq_feature = hq_features[i_batch].unsqueeze(0),
+                guiding_embedding=guiding_embedding,
+                prompt_encoder=prompt_encoder,
+
             )
             masks.append(mask)
             iou_preds.append(iou_pred)
+            uncertain_maps.append(interm_result[0]['unceratinty_map'])
+            final_masks.append(interm_result[0]['final_mask'])
+            coarse_masks.append(interm_result[0]['coarse_mask'])
+            refined_masks.append(interm_result[0]['refined_mask'])
         masks = torch.cat(masks,0)
+        uncertain_maps = torch.cat(uncertain_maps,0)
+        final_masks = torch.cat(final_masks,0)
+        coarse_masks = torch.cat(coarse_masks,0)
+        refined_masks = torch.cat(refined_masks,0)
         iou_preds = torch.cat(iou_preds,0)
 
         # Select the correct mask or masks for output
@@ -441,7 +543,7 @@ class MaskDecoderHQ(MaskDecoder):
         if hq_token_only:
             return masks_hq
         else:
-            return masks_sam, masks_hq
+            return masks_sam, masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks
 
     def predict_masks(
         self,
@@ -450,6 +552,9 @@ class MaskDecoderHQ(MaskDecoder):
         sparse_prompt_embeddings: torch.Tensor,
         dense_prompt_embeddings: torch.Tensor,
         hq_feature: torch.Tensor,
+        prompt_encoder,
+        guiding_embedding: torch.Tensor,
+
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Predicts masks. See 'forward' for more details."""
 
@@ -464,7 +569,9 @@ class MaskDecoderHQ(MaskDecoder):
         b, c, h, w = src.shape
 
         # Run the transformer
-        hs, src = self.transformer(src, pos_src, tokens)
+        prompt_adapter_args = {"guiding_embedding":guiding_embedding, "prompt_encoder": prompt_encoder,  "prompt_adapter": self.prompt_adapter,}
+        hs, src, Interm_result = self.transformer.forward_with_prompt_adapter(src, pos_src, tokens, prompt_adapter_args)
+        #hs, src = self.transformer(src, pos_src, tokens)
         iou_token_out = hs[:, 0, :]
         mask_tokens_out = hs[:, 1 : (1 + self.num_mask_tokens), :]
 
@@ -490,8 +597,7 @@ class MaskDecoderHQ(MaskDecoder):
         
         iou_pred = self.iou_prediction_head(iou_token_out)
 
-        return masks, iou_pred
-
+        return masks, iou_pred,Interm_result
 
 
 def show_anns(masks, input_point, input_box, input_label, filename, image, ious, boundary_ious):
@@ -619,7 +725,7 @@ def main(net,encoder,train_datasets, valid_datasets):
     lr_scheduler.last_epoch = 0
     train(net, encoder,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
-    evaluate(net,encoder,sam, valid_dataloaders)
+    #evaluate(net,encoder,sam, valid_dataloaders)
 
 
 def train(net,encoder,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
@@ -651,7 +757,7 @@ def train(net,encoder,optimizer, train_dataloaders, valid_dataloaders, lr_schedu
         metric_logger = misc.MetricLogger(delimiter="  ")
         # train_dataloaders.batch_sampler.sampler.set_epoch(epoch)
 
-        for data in metric_logger.log_every(train_dataloaders,1000):
+        for data in metric_logger.log_every(train_dataloaders,100):
             inputs, labels = data['image'], data['label']
             if torch.cuda.is_available():
                 inputs = inputs.to(device="cuda")
@@ -704,30 +810,13 @@ def train(net,encoder,optimizer, train_dataloaders, valid_dataloaders, lr_schedu
                         boxes=image_record.get("boxes", None),
                         masks=image_record.get("mask_inputs", None),
                     )
-                    low_res_masks, iou_predictions = sam.mask_decoder(
-                        image_embeddings=curr_embedding.unsqueeze(0),
-                        image_pe=sam.prompt_encoder.get_dense_pe(),
-                        sparse_prompt_embeddings=sparse_embeddings,
-                        dense_prompt_embeddings=dense_embeddings,
-                        multimask_output=False
-                    )
-                
-                masks = sam.postprocess_masks(
-                    low_res_masks,
-                    input_size=image_record["image"].shape[-2:],
-                    original_size=image_record["original_size"],
-                )
-                masks = masks > sam.mask_threshold
-
                 batched_output.append(
                     {
-                        "masks": masks,
-                        "iou_predictions": iou_predictions,
-                        "low_res_logits": low_res_masks,
                         "encoder_embedding": curr_embedding.unsqueeze(0),
                         "image_pe": sam.prompt_encoder.get_dense_pe(),
                         "sparse_embeddings":sparse_embeddings,
                         "dense_embeddings":dense_embeddings,
+                        "input_images":input_images
                     }
                 )
             batch_len = len(batched_output)
@@ -735,21 +824,26 @@ def train(net,encoder,optimizer, train_dataloaders, valid_dataloaders, lr_schedu
             image_pe = [batched_output[i_l]['image_pe'] for i_l in range(batch_len)]
             sparse_embeddings = [batched_output[i_l]['sparse_embeddings'] for i_l in range(batch_len)]
             dense_embeddings = [batched_output[i_l]['dense_embeddings'] for i_l in range(batch_len)]
+            input_images = batched_output[0]['input_images']
 
-            masks_hq = net(
+            masks_sam, masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks = net(
                 image_embeddings=encoder_embedding,
                 image_pe=image_pe,
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=False,
-                hq_token_only=True,
+                hq_token_only=False,
                 interm_embeddings=interm_embeddings,
+                input_images=input_images,
+                prompt_encoder=sam.prompt_encoder
             )
 
-            loss_mask, loss_dice = loss_masks(masks_hq, labels/255.0, len(masks_hq))
+            loss_mask, loss_dice = loss_masks_whole(masks_hq, labels/255.0, len(masks_hq)) 
             loss = loss_mask + loss_dice
-            
-            loss_dict = {"loss_mask": loss_mask, "loss_dice":loss_dice}
+            loss_mask_final, loss_dice_final = loss_masks_whole_uncertain(coarse_masks, refined_masks, labels/255.0, uncertain_maps, len(final_masks))
+            loss = loss + (loss_mask_final + loss_dice_final) 
+            loss_dict = {"loss_mask": loss_mask, "loss_dice":loss_dice, 
+                               "loss_mask_final": loss_mask_final, "loss_dice_final": loss_dice_final,}
 
             # reduce losses over all GPUs for logging purposes
             loss_dict_reduced = misc.reduce_dict(loss_dict)

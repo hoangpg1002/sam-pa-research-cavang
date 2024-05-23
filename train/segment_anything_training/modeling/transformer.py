@@ -88,22 +88,74 @@ class TwoWayTransformer(nn.Module):
         keys = image_embedding
 
         # Apply transformer blocks and final layernorm
-        for layer in self.layers:
+        for index, layer in enumerate(self.layers):
             queries, keys = layer(
                 queries=queries,
                 keys=keys,
                 query_pe=point_embedding,
                 key_pe=image_pe,
+                index=index
             )
 
         # Apply the final attenion layer from the points to the image
         q = queries + point_embedding
         k = keys + image_pe
-        attn_out = self.final_attn_token_to_image(q=q, k=k, v=keys)
+        attn_out, attn = self.final_attn_token_to_image(q=q, k=k, v=keys)
+
         queries = queries + attn_out
         queries = self.norm_final_attn(queries)
 
         return queries, keys
+
+    def forward_with_prompt_adapter(
+        self,
+        image_embedding: Tensor,
+        image_pe: Tensor,
+        point_embedding: Tensor,
+        prompt_adapter_args,
+    ) -> Tuple[Tensor, Tensor]:
+        """
+        Args:
+          image_embedding (torch.Tensor): image to attend to. Should be shape
+            B x embedding_dim x h x w for any h and w.
+          image_pe (torch.Tensor): the positional encoding to add to the image. Must
+            have the same shape as image_embedding.
+          point_embedding (torch.Tensor): the embedding to add to the query points.
+            Must have shape B x N_points x embedding_dim for any N_points.
+
+        Returns:
+          torch.Tensor: the processed point_embedding
+          torch.Tensor: the processed image_embedding
+        """
+        # BxCxHxW -> BxHWxC == B x N_image_tokens x C
+        bs, c, h, w = image_embedding.shape
+        image_embedding = image_embedding.flatten(2).permute(0, 2, 1)
+        image_pe = image_pe.flatten(2).permute(0, 2, 1)
+
+        # Prepare queries
+        queries = point_embedding
+        keys = image_embedding
+
+        # Apply transformer blocks and final layernorm
+        for index, layer in enumerate(self.layers):
+            queries, keys, query_pe, Interm_result = layer.forward_with_prompt_adapter(
+                queries=queries,
+                keys=keys,
+                query_pe=point_embedding,
+                key_pe=image_pe,
+                prompt_adapter_args=prompt_adapter_args,
+                index=index
+            )
+
+        # Apply the final attenion layer from the points to the image
+        q = queries + query_pe
+        k = keys + image_pe
+        attn_out, attn = self.final_attn_token_to_image(q=q, k=k, v=keys)
+
+        queries = queries + attn_out
+        queries = self.norm_final_attn(queries)
+
+        return queries, keys, Interm_result
 
 
 class TwoWayAttentionBlock(nn.Module):
@@ -149,21 +201,22 @@ class TwoWayAttentionBlock(nn.Module):
         self.skip_first_layer_pe = skip_first_layer_pe
 
     def forward(
-        self, queries: Tensor, keys: Tensor, query_pe: Tensor, key_pe: Tensor
+        self, queries: Tensor, keys: Tensor, query_pe: Tensor, key_pe: Tensor, index=0
     ) -> Tuple[Tensor, Tensor]:
         # Self attention block
         if self.skip_first_layer_pe:
-            queries = self.self_attn(q=queries, k=queries, v=queries)
+            queries, _ = self.self_attn(q=queries, k=queries, v=queries)
         else:
             q = queries + query_pe
-            attn_out = self.self_attn(q=q, k=q, v=queries)
+            attn_out, _ = self.self_attn(q=q, k=q, v=queries)
             queries = queries + attn_out
         queries = self.norm1(queries)
 
         # Cross attention block, tokens attending to image embedding
         q = queries + query_pe
         k = keys + key_pe
-        attn_out = self.cross_attn_token_to_image(q=q, k=k, v=keys)
+        attn_out, attn = self.cross_attn_token_to_image(q=q, k=k, v=keys)
+
         queries = queries + attn_out
         queries = self.norm2(queries)
 
@@ -175,11 +228,61 @@ class TwoWayAttentionBlock(nn.Module):
         # Cross attention block, image embedding attending to tokens
         q = queries + query_pe
         k = keys + key_pe
-        attn_out = self.cross_attn_image_to_token(q=k, k=q, v=queries)
+        attn_out, attn = self.cross_attn_image_to_token(q=k, k=q, v=queries)
+
         keys = keys + attn_out
         keys = self.norm4(keys)
 
         return queries, keys
+
+    def forward_with_prompt_adapter(
+        self, queries: Tensor, keys: Tensor, query_pe: Tensor, key_pe: Tensor, prompt_adapter_args, index=0
+    ) -> Tuple[Tensor, Tensor]:
+        # Self attention block
+        if self.skip_first_layer_pe:
+            queries, _ = self.self_attn(q=queries, k=queries, v=queries)
+        else:
+            q = queries + query_pe
+            attn_out, _ = self.self_attn(q=q, k=q, v=queries)
+            queries = queries + attn_out
+        queries = self.norm1(queries)
+
+        # Cross attention block, tokens attending to image embedding
+        q = queries + query_pe
+        k = keys + key_pe
+        attn_out, attn = self.cross_attn_token_to_image(q=q, k=k, v=keys)
+
+        # Prompt adapter
+        if index == 1:
+            prompt_adapter = prompt_adapter_args["prompt_adapter"]
+            mask= prompt_adapter(
+                queries, 
+                keys, 
+                query_pe, 
+                key_pe,  
+                prompt_adapter_args["prompt_encoder"], 
+                prompt_adapter_args["guiding_embedding"])
+            Interm_result = [mask]
+        else:
+            Interm_result = None
+
+        queries = queries + attn_out
+        queries = self.norm2(queries)
+
+        # MLP block
+        mlp_out = self.mlp(queries)
+        queries = queries + mlp_out
+        queries = self.norm3(queries)
+
+        # Cross attention block, image embedding attending to tokens
+        q = queries + query_pe
+        k = keys + key_pe
+        attn_out, attn = self.cross_attn_image_to_token(q=k, k=q, v=queries)
+
+        keys = keys + attn_out
+        keys = self.norm4(keys)
+
+        return queries, keys, query_pe, Interm_result
 
 
 class Attention(nn.Module):
@@ -237,4 +340,28 @@ class Attention(nn.Module):
         out = self._recombine_heads(out)
         out = self.out_proj(out)
 
-        return out
+        return out, attn
+
+    def forward_return_v(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        # Input projections
+        q = self.q_proj(q)
+        k = self.k_proj(k)
+        v = self.v_proj(v)
+
+        # Separate into heads
+        q = self._separate_heads(q, self.num_heads)
+        k = self._separate_heads(k, self.num_heads)
+        v = self._separate_heads(v, self.num_heads)
+
+        # Attention
+        _, _, _, c_per_head = q.shape
+        attn = q @ k.permute(0, 1, 3, 2)  # B x N_heads x N_tokens x N_tokens
+        attn = attn / math.sqrt(c_per_head)
+        attn = torch.softmax(attn, dim=-1)
+
+        # Get output
+        out = attn @ v
+        out = self._recombine_heads(out)
+        out = self.out_proj(out)
+
+        return out, self.out_proj(self._recombine_heads(v))
