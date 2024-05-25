@@ -165,7 +165,7 @@ class Block(nn.Module):
         self.window_size = window_size
         
 
-    def forward(self, x: torch.Tensor,add_features: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         shortcut = x
         #x = self.cross_branch_adapter(x,add_features)
         x= self.norm1(x) 
