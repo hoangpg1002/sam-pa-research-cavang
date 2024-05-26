@@ -520,7 +520,7 @@ class MaskDecoderHQ(MaskDecoder):
         if hq_token_only:
             return masks_hq
         else:
-            return masks_sam, masks_hq, iou_preds
+            return masks_sam, masks_hq
     def predict_masks(
         self,
         image_embeddings: torch.Tensor,
