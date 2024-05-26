@@ -138,7 +138,7 @@ class TwoWayTransformer(nn.Module):
 
         # Apply transformer blocks and final layernorm
         for index, layer in enumerate(self.layers):
-            queries, keys, query_pe, Interm_result = layer.forward_with_prompt_adapter(
+            queries, keys, query_pe = layer.forward_with_prompt_adapter(
                 queries=queries,
                 keys=keys,
                 query_pe=point_embedding,
@@ -155,7 +155,7 @@ class TwoWayTransformer(nn.Module):
         queries = queries + attn_out
         queries = self.norm_final_attn(queries)
 
-        return queries, keys, Interm_result
+        return queries, keys
 
 
 class TwoWayAttentionBlock(nn.Module):
@@ -255,16 +255,14 @@ class TwoWayAttentionBlock(nn.Module):
         # Prompt adapter
         if index == 1:
             prompt_adapter = prompt_adapter_args["prompt_adapter"]
-            mask= prompt_adapter(
+            attn_out_pa= prompt_adapter(
                 queries, 
                 keys, 
                 query_pe, 
                 key_pe,  
                 prompt_adapter_args["prompt_encoder"], 
                 prompt_adapter_args["guiding_embedding"])
-            Interm_result = [mask]
-        else:
-            Interm_result = None
+            attn_out=attn_out+attn_out_pa
 
         queries = queries + attn_out
         queries = self.norm2(queries)
@@ -282,7 +280,7 @@ class TwoWayAttentionBlock(nn.Module):
         keys = keys + attn_out
         keys = self.norm4(keys)
 
-        return queries, keys, query_pe, Interm_result
+        return queries, keys, query_pe
 
 
 class Attention(nn.Module):
