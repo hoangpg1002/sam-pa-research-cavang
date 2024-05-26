@@ -963,7 +963,7 @@ def evaluate(net,encoder, sam, valid_dataloaders):
             sparse_embeddings = [batched_output[i_l]['sparse_embeddings'] for i_l in range(batch_len)]
             dense_embeddings = [batched_output[i_l]['dense_embeddings'] for i_l in range(batch_len)]
             
-            masks_sam, masks_hq = net(
+            mask_sam,masks_hq = net(
                 image_embeddings=encoder_embedding,
                 image_pe=image_pe,
                 sparse_prompt_embeddings=sparse_embeddings,
@@ -971,6 +971,8 @@ def evaluate(net,encoder, sam, valid_dataloaders):
                 multimask_output=False,
                 hq_token_only=False,
                 interm_embeddings=interm_embeddings,
+                input_images=input_images,
+                prompt_encoder=sam.prompt_encoder
             )
 
             iou = compute_iou(masks_hq,labels_ori)
