@@ -700,9 +700,9 @@ def main(net,encoder,train_datasets, valid_datasets):
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     lr_scheduler.last_epoch = 0
-    train(net, encoder,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
-    sam = sam_model_registry["vit_b"](checkpoint="D:\StableDiffusion\sam-hq\train\pretrained_checkpoint\sam_vit_b_maskdecoder.pth").to(device="cuda")
-    #evaluate(net,encoder,sam, valid_dataloaders)
+    #train(net, encoder,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
+    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
+    evaluate(net,encoder,sam, valid_dataloaders)
 
 
 def train(net,encoder,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
@@ -947,26 +947,10 @@ def evaluate(net,encoder, sam, valid_dataloaders):
                         boxes=image_record.get("boxes", None),
                         masks=image_record.get("mask_inputs", None),
                     )
-                    low_res_masks, iou_predictions = sam.mask_decoder(
-                        image_embeddings=curr_embedding.unsqueeze(0),
-                        image_pe=sam.prompt_encoder.get_dense_pe(),
-                        sparse_prompt_embeddings=sparse_embeddings,
-                        dense_prompt_embeddings=dense_embeddings,
-                        multimask_output=False
-                    )
                 
-                masks = sam.postprocess_masks(
-                    low_res_masks,
-                    input_size=image_record["image"].shape[-2:],
-                    original_size=image_record["original_size"],
-                )
-                masks = masks > sam.mask_threshold
 
                 batched_output.append(
                     {
-                        "masks": masks,
-                        "iou_predictions": iou_predictions,
-                        "low_res_logits": low_res_masks,
                         "encoder_embedding": curr_embedding.unsqueeze(0),
                         "image_pe": sam.prompt_encoder.get_dense_pe(),
                         "sparse_embeddings":sparse_embeddings,
