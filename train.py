@@ -191,7 +191,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
         if epoch % 1 == 0:
             model_name = "/epoch_"+str(epoch)+".pth"
             print('come here save at', "train" + model_name)
-            misc.save_on_master(net.module.state_dict(), "train" + model_name)
+            misc.save_on_master(net.state_dict(), "train" + model_name)
     
     # Finish training
     print("Training Reaches The Maximum Epoch Number")
