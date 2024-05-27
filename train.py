@@ -73,7 +73,9 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
 
     net.train()
     _ = net.to(device="cuda")
-    
+    for n,p in net.named_parameters():
+        if p.requires_grad:
+            print(n)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth")
     _ = sam.to(device="cuda")
     #sam = torch.nn.parallel.DistributedDataParallel(sam, device_ids=[args.gpu], find_unused_parameters=args.find_unused_params)
