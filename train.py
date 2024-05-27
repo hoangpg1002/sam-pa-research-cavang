@@ -49,7 +49,7 @@ def main(net, train_datasets, valid_datasets, ):
                                                           my_transforms = [
                                                                         Resize([1024,1024])
                                                                     ],
-                                                          batch_size=4,
+                                                          batch_size=1,
                                                           training=False)
     print(len(valid_dataloaders), " valid dataloaders created")
     
