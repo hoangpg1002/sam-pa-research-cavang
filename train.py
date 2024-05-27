@@ -85,7 +85,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
         os.environ["CURRENT_EPOCH"] = str(epoch)
         metric_logger = misc.MetricLogger(delimiter="  ")
 
-        for data in metric_logger.log_every(train_dataloaders, 500):
+        for data in metric_logger.log_every(train_dataloaders, 200):
             inputs, labels = data['image'], data['label']
             if torch.cuda.is_available():
                 inputs = inputs.cuda()

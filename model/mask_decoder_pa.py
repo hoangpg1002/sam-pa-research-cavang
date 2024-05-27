@@ -70,7 +70,7 @@ class PromptAdapater(nn.Module):
 
 
         refined_mask = (output_refined_token @ image_embedding).view(b, 1, 64, 64)
-        coarse_mask = (queries[:,1,:] @ image_embedding).view(b, 1, 64, 64)
+        coarse_mask = (queries[:,4,:] @ image_embedding).view(b, 1, 64, 64)
         final_mask = (unceratinty_map_norm>=0.5).detach()*refined_mask + (unceratinty_map_norm<0.5).detach()*coarse_mask
         mask = {"unceratinty_map": unceratinty_map_norm, 
                       "refined_mask": refined_mask,
