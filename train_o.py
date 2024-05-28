@@ -147,7 +147,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
                 multimask_output=False,
                 interm_embeddings=interm_embeddings,
                 image_record=image_record,
-                prompt_encoder=sam.module.prompt_encoder,
+                prompt_encoder=sam.prompt_encoder,
                 input_images=input_images
             )
 
@@ -264,7 +264,7 @@ def evaluate(net, sam, valid_dataloaders):
                 multimask_output=False,
                 interm_embeddings=interm_embeddings,
                 image_record=image_record,
-                prompt_encoder=sam.module.prompt_encoder,
+                prompt_encoder=sam.prompt_encoder,
                 input_images=input_images
             )
 
