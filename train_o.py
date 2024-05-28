@@ -61,7 +61,7 @@ def main(net, train_datasets, valid_datasets, ):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     lr_scheduler.last_epoch = 0
     train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
-    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_l_0b3195.pth").to(device="cuda")
+    sam = sam_model_registry["vit_l"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_l_0b3195.pth").to(device="cuda")
     evaluate(net, sam, valid_dataloaders)
 
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
@@ -76,7 +76,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     for n,p in net.named_parameters():
         if p.requires_grad:
             print(n)
-    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_l_0b3195.pth")
+    sam = sam_model_registry["vit_l"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_l_0b3195.pth")
     _ = sam.to(device="cuda")
     #sam = torch.nn.parallel.DistributedDataParallel(sam, device_ids=[args.gpu], find_unused_parameters=args.find_unused_params)
     
