@@ -152,7 +152,7 @@ class PromptAdapater(nn.Module):
         return  sample_pe, sample_content
 
 class MaskDecoderPA(MaskDecoder):
-    def __init__(self, model_type):
+    def __init__(self, model_type,is_train=False):
         super().__init__(transformer_dim=256,
                         transformer=TwoWayTransformer(
                                 depth=2,
@@ -193,6 +193,9 @@ class MaskDecoderPA(MaskDecoder):
         )
         #-----------------------prompt adapter-------------------------------
         self.prompt_adapter = PromptAdapater(transformer_dim,self.transformer.num_heads)
+        if is_train==True:
+            self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_2.pth"))
+            print("load success!")
 
 
 

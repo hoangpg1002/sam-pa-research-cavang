@@ -369,6 +369,6 @@ if __name__ == "__main__":
     valid_datasets = [dataset_dis_val,dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
     # train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
     # valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    net = MaskDecoderPA("vit_b") 
+    net = MaskDecoderPA("vit_b",is_train=True) 
 
     main(net, train_datasets, valid_datasets)
