@@ -82,7 +82,6 @@ class PromptAdapater(nn.Module):
             gumbel_dist = torch.distributions.gumbel.Gumbel(
                 torch.tensor(0., device=point_sample_ref_map.device, dtype=point_sample_ref_map.dtype),
                 torch.tensor(1., device=point_sample_ref_map.device, dtype=point_sample_ref_map.dtype))
-            print("self.training",self.training)
             # gumbel softmax top-k
             if self.training:
                 ret_p = self.gumbel_softmax_topk(gumbel_dist, point_sample_ref_map, n_sample_points) # B × HW

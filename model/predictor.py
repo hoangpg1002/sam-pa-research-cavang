@@ -233,7 +233,6 @@ class SamPredictor:
         )
 
         # Predict masks
-        print("input_image",self.input_image.shape)
         # import matplotlib.pyplot as plt
         # plt.imshow(self.input_image.detach().cpu().squeeze(0).permute(1, 2, 0))
         # plt.show()
