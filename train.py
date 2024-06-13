@@ -155,7 +155,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
             loss_mask, loss_dice = loss_masks_whole(masks_hq, labels/255.0, len(masks_hq)) 
             loss = loss_mask + loss_dice
 
-            loss_mask_final, loss_dice_final = loss_masks_whole_uncertain(masks_hq, refined_masks, labels/255.0, uncertain_maps, len(final_masks))
+            loss_mask_final, loss_dice_final = loss_masks_whole_uncertain(coarse_masks, refined_masks, labels/255.0, uncertain_maps, len(final_masks))
             loss = loss + (loss_mask_final + loss_dice_final)     
             loss_uncertain_map, gt_uncertain = loss_uncertain(uncertain_maps, labels)  
             loss = loss + loss_uncertain_map
