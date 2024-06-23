@@ -173,8 +173,8 @@ class MaskDecoderPA(MaskDecoder):
         self.load_state_dict(torch.load(checkpoint_path))
         print("PA Decoder init from SAM MaskDecoder")
         for n,p in self.named_parameters():
-            if "output_upscaling" in n or "output_hypernetworks_mlps" in n or "mask_tokens" in n:
-                continue
+            # if "output_upscaling" in n or "output_hypernetworks_mlps" in n or "mask_tokens" in n:
+            #     continue
             p.requires_grad = False
 
         transformer_dim=256
