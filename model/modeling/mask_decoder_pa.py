@@ -51,9 +51,9 @@ class PromptAdapater(nn.Module):
         queries = attn_out
 
         # generating uncertain token and refined token
-        uncertain_token = torch.cat([self.static_uncertain_token.weight.repeat(b,1), queries[:,1,:]], dim=-1)
+        uncertain_token = torch.cat([self.static_uncertain_token.weight.repeat(b,1), queries[:,4,:]], dim=-1)
         uncertain_token = self.uncertain_mlp(uncertain_token).unsqueeze(1)
-        refined_token = torch.cat([self.static_refined_token.weight.repeat(b,1), queries[:,1,:]], dim=-1)
+        refined_token = torch.cat([self.static_refined_token.weight.repeat(b,1), queries[:,4,:]], dim=-1)
         refined_token = self.refined_mlp(refined_token).unsqueeze(1)
 
         # obtain mask by U*R+(1-U)*M  (return uncertain map and mask for loss calculation)
@@ -65,7 +65,7 @@ class PromptAdapater(nn.Module):
 
 
         refined_mask = (output_refined_token @ image_embedding).view(b, 1, 64, 64)
-        coarse_mask = (queries[:,1,:] @ image_embedding).view(b, 1, 64, 64)
+        coarse_mask = (queries[:,4,:] @ image_embedding).view(b, 1, 64, 64)
         final_mask = (unceratinty_map_norm>=0.5).detach()*refined_mask + (unceratinty_map_norm<0.5).detach()*coarse_mask
         mask = {"unceratinty_map": unceratinty_map_norm, 
                       "refined_mask": refined_mask,
@@ -73,7 +73,7 @@ class PromptAdapater(nn.Module):
                       "final_mask": final_mask}
 
         # replace mask token with refined token
-        queries = torch.cat([queries[:,0:1,:], output_refined_token, queries[:,2:,:]],dim=1)
+        queries = torch.cat([queries[:,0:4,:], output_refined_token, queries[:,5:,:]],dim=1)
 
         # obtain new point, including position and content
         if int(os.environ.get("CURRENT_EPOCH", 0))>4 or not self.training:
