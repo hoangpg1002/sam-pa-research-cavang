@@ -257,7 +257,7 @@ def evaluate(net, sam, valid_dataloaders):
             image_record = [batched_output[i_l]['image_record'] for i_l in range(batch_len)]
             input_images = batched_output[0]['input_images']
 
-            masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks, box_preds = net(
+            masks_sam, masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks, box_preds = net(
                 image_embeddings=encoder_embedding,
                 image_pe=image_pe,
                 sparse_prompt_embeddings=sparse_embeddings,
