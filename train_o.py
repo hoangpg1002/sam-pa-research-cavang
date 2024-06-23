@@ -60,7 +60,7 @@ def main(net, train_datasets, valid_datasets, ):
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     lr_scheduler.last_epoch = 0
-    train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
+    #train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
     evaluate(net, sam, valid_dataloaders)
 
@@ -299,8 +299,8 @@ if __name__ == "__main__":
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
     dataset_dis_local = {"name": "DIS5K-TR",
-                 "im_dir": r"D:\StableDiffusion\sam-hq\data\DIS5K\DIS5K\DIS-TR\im",
-                 "gt_dir": r"D:\StableDiffusion\sam-hq\data\DIS5K\DIS5K\DIS-TR\gt",
+                 "im_dir": r"D:\StableDiffusion\sam-hq\data\DIS5K\DIS5K\DIS-VD\im",
+                 "gt_dir": r"D:\StableDiffusion\sam-hq\data\DIS5K\DIS5K\DIS-VD\gt",
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
 
@@ -365,10 +365,10 @@ if __name__ == "__main__":
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
 
-    #train_datasets = [dataset_thin]
-    #valid_datasets = [dataset_dis_val,dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
-    valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    net = MaskDecoderPA("vit_b",is_train=True) 
+    train_datasets = [dataset_dis_local]
+    valid_datasets = [dataset_dis_local] 
+    #train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
+    #valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+    net = MaskDecoderPA("vit_b",is_train=False) 
 
     main(net, train_datasets, valid_datasets)

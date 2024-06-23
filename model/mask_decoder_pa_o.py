@@ -76,7 +76,7 @@ class PromptAdapater(nn.Module):
                       "refined_mask": refined_mask,
                       "coarse_mask": coarse_mask, 
                       "final_mask": final_mask}
-
+        print(queries.shape)
         # replace mask token with refined token
         queries = torch.cat([queries[:,0:1,:], output_refined_token, queries[:,2:,:]],dim=1)
 

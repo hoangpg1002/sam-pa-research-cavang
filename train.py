@@ -263,7 +263,7 @@ def evaluate(net, sam, valid_dataloaders):
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=False,
-                hq_token_only=True,
+                hq_token_only=False,
                 interm_embeddings=interm_embeddings,
                 image_record=image_record,
                 prompt_encoder=sam.prompt_encoder,
