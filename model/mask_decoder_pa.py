@@ -215,9 +215,13 @@ class MaskDecoderPA(MaskDecoder):
         )
         #-----------------------prompt adapter-------------------------------
         self.prompt_adapter = PromptAdapater(transformer_dim,self.transformer.num_heads)
+        self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam__hq_vit_b_maskdecoder.pth"),strict=False)
+        print("load hq_sam_vit_b_maskdecoder")
         if is_train==True:
             self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_3.pth"))
             print("load success!")
+            self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam__hq_vit_b_maskdecoder.pth"),strict=False)
+            print("load hq_sam_vit_b_maskdecoder")
 
 
 
