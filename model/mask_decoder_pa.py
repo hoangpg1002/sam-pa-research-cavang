@@ -218,10 +218,9 @@ class MaskDecoderPA(MaskDecoder):
         self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam_hq_vit_b_maskdecoder.pth"),strict=False)
         print("load hq_sam_vit_b_maskdecoder")
         if is_train==True:
-            self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_3.pth"))
+            self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_2.pth"))
             print("load success!")
-            self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam_hq_vit_b_maskdecoder.pth"),strict=False)
-            print("load hq_sam_vit_b_maskdecoder")
+
 
 
 
