@@ -202,6 +202,10 @@ class MaskDecoderPA(MaskDecoder):
                                         LayerNorm2d(transformer_dim // 4),
                                         nn.GELU(),
                                         nn.Conv2d(transformer_dim // 4, transformer_dim // 8, 3, 1, 1))
+        self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam_hq_vit_b_maskdecoder.pth"),strict=False)
+        print("load hq_sam_vit_b_maskdecoder")
+        for n,p in self.named_parameters():
+            p.requires_grad = False
 
         #-----------------------image guiding---------------------------------
         self.guiding_conv = nn.Sequential(
@@ -215,8 +219,6 @@ class MaskDecoderPA(MaskDecoder):
         )
         #-----------------------prompt adapter-------------------------------
         self.prompt_adapter = PromptAdapater(transformer_dim,self.transformer.num_heads)
-        self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam_hq_vit_b_maskdecoder.pth"),strict=False)
-        print("load hq_sam_vit_b_maskdecoder")
         if is_train==True:
             self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/epoch_2.pth"))
             print("load success!")
