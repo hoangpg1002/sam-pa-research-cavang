@@ -67,7 +67,7 @@ def main(net, train_datasets, valid_datasets, ):
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
-    epoch_start = 1
+    epoch_start = 2
     epoch_num = 20
     train_num = len(train_dataloaders)
 
