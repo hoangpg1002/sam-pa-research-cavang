@@ -19,7 +19,7 @@ from utils.losses import loss_masks, loss_masks_whole, loss_masks_whole_uncertai
 from utils.function import show_heatmap, show_anns, show_heatmap_ax, show_anns_ax, show_mask, show_points, show_box, show_only_points, compute_iou, compute_boundary_iou
 import utils.misc as misc
 
-from model.mask_decoder_pa import MaskDecoderPA
+from model.mask_decoder_pa_tpu import MaskDecoderPA
 
 import logging
 import csv
