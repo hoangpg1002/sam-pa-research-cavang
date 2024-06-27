@@ -69,7 +69,7 @@ def main(net, train_datasets, valid_datasets, ):
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device)
     #evaluate(net, sam, valid_dataloaders)
 
-def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
+def train(rank, net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
     torch.set_default_tensor_type('torch.FloatTensor')
