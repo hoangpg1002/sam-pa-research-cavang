@@ -64,13 +64,16 @@ def main(net, train_datasets, valid_datasets, ):
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     lr_scheduler.last_epoch = 3
-    train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
+    #train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
+    xmp.spawn(train, args=(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler), nprocs=8, start_method='fork')
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device)
-    evaluate(net, sam, valid_dataloaders)
+    #evaluate(net, sam, valid_dataloaders)
 
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
+    torch.set_default_tensor_type('torch.FloatTensor')
+    device = xm.xla_device()
     epoch_start = 4
     epoch_num = 20
     train_num = len(train_dataloaders)
@@ -78,6 +81,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     #net.train()
     #_ = net.to(device=device)
     net = xmp.MpModelWrapper(net)
+    net.to(device)
     net.train()
     for n,p in net.named_parameters():
         if p.requires_grad:
@@ -90,8 +94,8 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
         print("epoch:   ",epoch, "  learning rate:  ", optimizer.param_groups[0]["lr"])
         os.environ["CURRENT_EPOCH"] = str(epoch)
         metric_logger = misc.MetricLogger(delimiter="  ")
-
-        for data in metric_logger.log_every(train_dataloaders, 1000):
+        train_loader = pl.MpDeviceLoader(train_dataloaders, device)
+        for data in metric_logger.log_every(train_loader, 1000):
             inputs, labels = data['image'], data['label']
             if torch.cuda.is_available():
                 inputs = inputs.to(device)
@@ -214,14 +218,9 @@ def evaluate(net, sam, valid_dataloaders):
         metric_logger = misc.MetricLogger(delimiter="  ")
         valid_dataloader = valid_dataloaders[k]
         print('valid_dataloader len:', len(valid_dataloader))
-        
-        iou_result = []
-        biou_result = []
-        img_id = []
-        dataset_name = ['DIS','COIFT','HRSOD','ThinObject']
-        total_time = 0
+        valid_loader = pl.MpDeviceLoader(valid_dataloaders[k], device)
 
-        for data_val in metric_logger.log_every(valid_dataloader,1000):
+        for data_val in metric_logger.log_every(valid_loader,1000):
             imidx_val, inputs_val, labels_val, shapes_val, labels_ori = data_val['imidx'], data_val['image'], data_val['label'], data_val['shape'], data_val['ori_label']
 
             if torch.cuda.is_available():
