@@ -97,9 +97,8 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
         train_loader = pl.MpDeviceLoader(train_dataloaders, device)
         for data in metric_logger.log_every(train_loader, 1000):
             inputs, labels = data['image'], data['label']
-            if torch.cuda.is_available():
-                inputs = inputs.to(device)
-                labels = labels.to(device)
+            inputs = inputs.to(device)
+            labels = labels.to(device)
 
             imgs = inputs.permute(0, 2, 3, 1).cpu().numpy()
             
