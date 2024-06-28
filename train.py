@@ -365,12 +365,82 @@ if __name__ == "__main__":
                  "gt_dir": "/kaggle/input/hq44kseg/DIS5K/DIS5K/DIS-VD/gt",
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
+    ###################
+    dataset_dis_sample = {"name": "DIS5K-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-TR/im",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-TR/gt",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
 
+
+    dataset_thin_sample = {"name": "ThinObject5k-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/images_train",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/masks_train",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_fss_sample = {"name": "FSS",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/fss_all",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/fss_all",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_duts_sample = {"name": "DUTS-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TR",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TR",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_duts_te_sample = {"name": "DUTS-TE",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TE",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TE",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_ecssd_sample = {"name": "ECSSD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/ecssd",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/ecssd",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_msra_sample = {"name": "MSRA10K",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/MSRA_10K",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/MSRA_10K",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    # valid set
+    dataset_coift_val_sample = {"name": "COIFT",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/COIFT/images",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/COIFT/masks",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_hrsod_val_sample = {"name": "HRSOD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/HRSOD/images",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/HRSOD/masks_max255",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_thin_val_sample = {"name": "ThinObject5k-TE",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/images_test",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/masks_test",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_dis_val_sample = {"name": "DIS5K-VD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-VD/im",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-VD/gt",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
     #train_datasets = [dataset_thin]
     #valid_datasets = [dataset_dis_val,dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
-    valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+    # train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
+    # valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+
+    train_datasets = [dataset_dis_sample, dataset_thin_sample, dataset_fss_sample, dataset_duts_sample, dataset_duts_te_sample, dataset_ecssd_sample, dataset_msra_sample]
+    valid_datasets = [dataset_dis_val_sample, dataset_coift_val_sample, dataset_hrsod_val_sample, dataset_thin_val_sample] 
  
-    net = MaskDecoderPA("vit_b",is_train=True) 
+    net = MaskDecoderPA("vit_b",is_train=False) 
 
     main(net, train_datasets, valid_datasets)
