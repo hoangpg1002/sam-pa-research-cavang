@@ -170,8 +170,7 @@ class MaskDecoderPA(MaskDecoder):
                            "vit_l":"pretrained_checkpoint/sam_vit_l_maskdecoder.pth",
                            'vit_h':"pretrained_checkpoint/sam_vit_h_maskdecoder.pth"}
         checkpoint_path = checkpoint_dict[model_type]
-        device = torch.device('cpu') if not torch.cuda.is_available() else torch.device('cuda')
-        self.load_state_dict(torch.load(checkpoint_path, map_location=device))
+        self.load_state_dict(torch.load(checkpoint_path))
         print("PA Decoder init from SAM MaskDecoder")
         for n,p in self.named_parameters():
             # if "output_upscaling" in n or "output_hypernetworks_mlps" in n or "mask_tokens" in n:
@@ -205,8 +204,6 @@ class MaskDecoderPA(MaskDecoder):
                                         nn.Conv2d(transformer_dim // 4, transformer_dim // 8, 3, 1, 1))
         self.load_state_dict(torch.load("/kaggle/working/training/pretrained_checkpoint/sam_hq_vit_b_maskdecoder.pth"),strict=False)
         print("load hq_sam_vit_b_maskdecoder")
-        for n,p in self.named_parameters():
-            p.requires_grad = False
 
         #-----------------------image guiding---------------------------------
         self.guiding_conv = nn.Sequential(

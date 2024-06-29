@@ -19,7 +19,7 @@ from utils.losses import loss_masks, loss_masks_whole, loss_masks_whole_uncertai
 from utils.function import show_heatmap, show_anns, show_heatmap_ax, show_anns_ax, show_mask, show_points, show_box, show_only_points, compute_iou, compute_boundary_iou
 import utils.misc as misc
 
-from model.mask_decoder_pa_tpu import MaskDecoderPA
+from model.mask_decoder_pa_unfreeze import MaskDecoderPA
 
 import logging
 import csv
@@ -27,12 +27,8 @@ import time
 
 import warnings
 warnings.filterwarnings('ignore')
-##for tpu
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.debug.metrics as met
-device = xm.xla_device()
+
+
 def main(net, train_datasets, valid_datasets, ):
     ### --- Step 1: Train or Valid dataset ---
 
@@ -63,42 +59,37 @@ def main(net, train_datasets, valid_datasets, ):
     print("--- define optimizer ---")
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    lr_scheduler.last_epoch = 3
-    #train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
-    xmp.spawn(train, args=(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler), nprocs=8, start_method='fork')
-    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device)
-    #evaluate(net, sam, valid_dataloaders)
+    lr_scheduler.last_epoch = 0
+    train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
+    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
+    evaluate(net, sam, valid_dataloaders)
 
-def train(rank, net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
+def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
-    torch.set_default_tensor_type('torch.FloatTensor')
-    device = xm.xla_device()
-    epoch_start = 4
+    epoch_start = 0
     epoch_num = 20
     train_num = len(train_dataloaders)
 
-    #net.train()
-    #_ = net.to(device=device)
-    net = xmp.MpModelWrapper(net)
-    net.to(device)
     net.train()
+    _ = net.to(device="cuda")
     for n,p in net.named_parameters():
         if p.requires_grad:
             print(n)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth")
-    _ = sam.to(device)
+    _ = sam.to(device="cuda")
     #sam = torch.nn.parallel.DistributedDataParallel(sam, device_ids=[args.gpu], find_unused_parameters=args.find_unused_params)
     
     for epoch in range(epoch_start,epoch_num): 
         print("epoch:   ",epoch, "  learning rate:  ", optimizer.param_groups[0]["lr"])
         os.environ["CURRENT_EPOCH"] = str(epoch)
         metric_logger = misc.MetricLogger(delimiter="  ")
-        train_loader = pl.MpDeviceLoader(train_dataloaders, device)
-        for data in metric_logger.log_every(train_loader, 1000):
+
+        for data in metric_logger.log_every(train_dataloaders, 1000):
             inputs, labels = data['image'], data['label']
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            if torch.cuda.is_available():
+                inputs = inputs.cuda()
+                labels = labels.cuda()
 
             imgs = inputs.permute(0, 2, 3, 1).cpu().numpy()
             
@@ -181,8 +172,7 @@ def train(rank, net, optimizer, train_dataloaders, valid_dataloaders, lr_schedul
             optimizer.zero_grad()
             loss.backward()
 
-            #optimizer.step()
-            xm.optimizer_step(optimizer)
+            optimizer.step()
 
             metric_logger.update(training_loss=loss_value, **loss_dict_reduced)
 
@@ -209,7 +199,7 @@ def train(rank, net, optimizer, train_dataloaders, valid_dataloaders, lr_schedul
 def evaluate(net, sam, valid_dataloaders):
     
     net.eval()
-    net.to(device=device)
+    net.to(device="cuda")
     print("Validating...")
     test_stats = {}
 
@@ -217,9 +207,14 @@ def evaluate(net, sam, valid_dataloaders):
         metric_logger = misc.MetricLogger(delimiter="  ")
         valid_dataloader = valid_dataloaders[k]
         print('valid_dataloader len:', len(valid_dataloader))
-        valid_loader = pl.MpDeviceLoader(valid_dataloaders[k], device)
+        
+        iou_result = []
+        biou_result = []
+        img_id = []
+        dataset_name = ['DIS','COIFT','HRSOD','ThinObject']
+        total_time = 0
 
-        for data_val in metric_logger.log_every(valid_loader,1000):
+        for data_val in metric_logger.log_every(valid_dataloader,1000):
             imidx_val, inputs_val, labels_val, shapes_val, labels_ori = data_val['imidx'], data_val['image'], data_val['label'], data_val['shape'], data_val['ori_label']
 
             if torch.cuda.is_available():
@@ -370,11 +365,81 @@ if __name__ == "__main__":
                  "gt_dir": "/kaggle/input/hq44kseg/DIS5K/DIS5K/DIS-VD/gt",
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
+    ###################
+    dataset_dis_sample = {"name": "DIS5K-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-TR/im",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-TR/gt",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
 
+
+    dataset_thin_sample = {"name": "ThinObject5k-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/images_train",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/masks_train",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_fss_sample = {"name": "FSS",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/fss_all",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/fss_all",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_duts_sample = {"name": "DUTS-TR",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TR",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TR",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_duts_te_sample = {"name": "DUTS-TE",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TE",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/DUTS-TE",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_ecssd_sample = {"name": "ECSSD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/ecssd",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/ecssd",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_msra_sample = {"name": "MSRA10K",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/MSRA_10K",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/cascade_psp/MSRA_10K",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    # valid set
+    dataset_coift_val_sample = {"name": "COIFT",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/COIFT/images",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/COIFT/masks",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_hrsod_val_sample = {"name": "HRSOD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/HRSOD/images",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/HRSOD/masks_max255",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_thin_val_sample = {"name": "ThinObject5k-TE",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/images_test",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/thin_object_detection/ThinObject5K/masks_test",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
+
+    dataset_dis_val_sample = {"name": "DIS5K-VD",
+                 "im_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-VD/im",
+                 "gt_dir": "/kaggle/input/hq44k-sample/hq44k_sample/DIS5K/DIS-VD/gt",
+                 "im_ext": ".jpg",
+                 "gt_ext": ".png"}
     #train_datasets = [dataset_thin]
     #valid_datasets = [dataset_dis_val,dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
-    valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+    # train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
+    # valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+
+    train_datasets = [dataset_dis_sample, dataset_thin_sample, dataset_fss_sample, dataset_duts_sample, dataset_duts_te_sample, dataset_ecssd_sample, dataset_msra_sample]
+    valid_datasets = [dataset_dis_val_sample, dataset_coift_val_sample, dataset_hrsod_val_sample, dataset_thin_val_sample] 
  
     net = MaskDecoderPA("vit_b",is_train=False) 
 
