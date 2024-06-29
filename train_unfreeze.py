@@ -59,7 +59,7 @@ def main(net, train_datasets, valid_datasets, ):
     print("--- define optimizer ---")
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    lr_scheduler.last_epoch = 0
+    lr_scheduler.last_epoch = 2
     train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
     evaluate(net, sam, valid_dataloaders)
@@ -67,7 +67,7 @@ def main(net, train_datasets, valid_datasets, ):
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
-    epoch_start = 0
+    epoch_start = 3
     epoch_num = 20
     train_num = len(train_dataloaders)
 
@@ -257,13 +257,13 @@ def evaluate(net, sam, valid_dataloaders):
             image_record = [batched_output[i_l]['image_record'] for i_l in range(batch_len)]
             input_images = batched_output[0]['input_images']
 
-            masks_sam, masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks, box_preds = net(
+            masks_hq, iou_preds, uncertain_maps, final_masks, coarse_masks, refined_masks, box_preds = net(
                 image_embeddings=encoder_embedding,
                 image_pe=image_pe,
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=False,
-                hq_token_only=False,
+                hq_token_only=True,
                 interm_embeddings=interm_embeddings,
                 image_record=image_record,
                 prompt_encoder=sam.prompt_encoder,
