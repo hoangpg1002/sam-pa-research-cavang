@@ -59,7 +59,7 @@ def main(net, train_datasets, valid_datasets, ):
     print("--- define optimizer ---")
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    lr_scheduler.last_epoch = 7
+    lr_scheduler.last_epoch = 0
     train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
     evaluate(net, sam, valid_dataloaders)
@@ -67,7 +67,7 @@ def main(net, train_datasets, valid_datasets, ):
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
-    epoch_start = 8
+    epoch_start = 0
     epoch_num = 20
     train_num = len(train_dataloaders)
 
@@ -435,11 +435,11 @@ if __name__ == "__main__":
                  "gt_ext": ".png"}
     #train_datasets = [dataset_thin]
     #valid_datasets = [dataset_dis_val,dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    # train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
-    # valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+    train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
+    valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
 
-    train_datasets = [dataset_dis_sample, dataset_thin_sample, dataset_fss_sample, dataset_duts_sample, dataset_duts_te_sample, dataset_ecssd_sample, dataset_msra_sample]
-    valid_datasets = [dataset_dis_val_sample, dataset_coift_val_sample, dataset_hrsod_val_sample, dataset_thin_val_sample] 
+    #train_datasets = [dataset_dis_sample, dataset_thin_sample, dataset_fss_sample, dataset_duts_sample, dataset_duts_te_sample, dataset_ecssd_sample, dataset_msra_sample]
+    #valid_datasets = [dataset_dis_val_sample, dataset_coift_val_sample, dataset_hrsod_val_sample, dataset_thin_val_sample] 
  
     net = MaskDecoderPA("vit_b",is_train=True) 
 
