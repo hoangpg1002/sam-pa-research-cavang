@@ -55,7 +55,7 @@ def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_ch
         input_box=res_ins['bbox']
         input_box=[input_box[0],input_box[1],input_box[0]+input_box[2],input_box[1]+input_box[3]]
         input_box = np.array(input_box)
-        masks, ious, _ = predictor.predict(
+        masks, ious, logits = predictor.predict(
             point_coords=None,
             point_labels=None,
             box=input_box[None, :],
