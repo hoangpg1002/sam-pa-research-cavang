@@ -59,6 +59,7 @@ def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_ch
             point_coords=None,
             point_labels=None,
             box=input_box[None, :],
+            # hq_token_only=True,
             multimask_output = False,
         )
         
