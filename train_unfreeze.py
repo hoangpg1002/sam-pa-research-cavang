@@ -62,7 +62,7 @@ def main(net, train_datasets, valid_datasets, ):
     lr_scheduler.last_epoch = 1
     train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
-    evaluate(net, sam, valid_dataloaders)
+    #evaluate(net, sam, valid_dataloaders)
 
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
