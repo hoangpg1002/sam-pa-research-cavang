@@ -59,7 +59,7 @@ def main(net, train_datasets, valid_datasets, ):
     print("--- define optimizer ---")
     optimizer = optim.Adam(net.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
-    lr_scheduler.last_epoch = 1
+    lr_scheduler.last_epoch = 3
     train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
     sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
     #evaluate(net, sam, valid_dataloaders)
@@ -67,7 +67,7 @@ def main(net, train_datasets, valid_datasets, ):
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     if misc.is_main_process():
         os.makedirs("train", exist_ok=True)
-    epoch_start = 2
+    epoch_start = 4
     epoch_num = 20
     train_num = len(train_dataloaders)
 
