@@ -61,7 +61,7 @@ def main(net, train_datasets, valid_datasets, ):
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 10)
     lr_scheduler.last_epoch = 0
     #train(net,optimizer, train_dataloaders, valid_dataloaders, lr_scheduler)
-    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth").to(device="cuda")
+    sam = sam_model_registry["vit_l"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_l_01ec64.pth").to(device="cuda")
     evaluate(net, sam, valid_dataloaders)
 
 def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
@@ -76,7 +76,7 @@ def train(net, optimizer, train_dataloaders, valid_dataloaders, lr_scheduler):
     for n,p in net.named_parameters():
         if p.requires_grad:
             print(n)
-    sam = sam_model_registry["vit_b"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth")
+    sam = sam_model_registry["vit_l"](checkpoint="/kaggle/working/training/pretrained_checkpoint/sam_vit_b_01ec64.pth")
     _ = sam.to(device="cuda")
     #sam = torch.nn.parallel.DistributedDataParallel(sam, device_ids=[args.gpu], find_unused_parameters=args.find_unused_params)
     
@@ -365,10 +365,10 @@ if __name__ == "__main__":
                  "im_ext": ".jpg",
                  "gt_ext": ".png"}
 
-    train_datasets = [dataset_dis_local]
-    valid_datasets = [dataset_dis_local] 
-    #train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
-    #valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
-    net = MaskDecoderPA("vit_b",is_train=False) 
+    #train_datasets = [dataset_dis_local]
+    #valid_datasets = [dataset_dis_local] 
+    train_datasets = [dataset_dis, dataset_thin, dataset_fss, dataset_duts, dataset_duts_te, dataset_ecssd, dataset_msra]
+    valid_datasets = [dataset_dis_val, dataset_coift_val, dataset_hrsod_val, dataset_thin_val] 
+    net = MaskDecoderPA("vit_l",is_train=True) 
 
     main(net, train_datasets, valid_datasets)
