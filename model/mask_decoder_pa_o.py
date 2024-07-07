@@ -170,7 +170,7 @@ class MaskDecoderPA(MaskDecoder):
                            "vit_l":"/kaggle/working/training/pretrained_checkpoint/sam_vit_l_maskdecoder.pth",
                            'vit_h':"pretrained_checkpoint/sam_vit_h_maskdecoder.pth"}
         checkpoint_path = checkpoint_dict[model_type]
-        self.load_state_dict(torch.load(checkpoint_path))
+        #self.load_state_dict(torch.load(checkpoint_path))
         print("PA Decoder init from SAM MaskDecoder")
         for n,p in self.named_parameters():
             if "output_upscaling" in n or "output_hypernetworks_mlps" in n or "mask_tokens" in n:
