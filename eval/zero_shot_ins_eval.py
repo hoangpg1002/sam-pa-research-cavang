@@ -13,7 +13,7 @@ import json
 import sys
 #from tinysam import sam_model_registry, SamPredictor
 sys.path.append("D:\StableDiffusion\pa-sam")
-from pa_sam_goc import sam_model_registry,SamPredictor
+from model import sam_model_registry,SamPredictor
 import argparse
 
 def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_checkpoint_path):
