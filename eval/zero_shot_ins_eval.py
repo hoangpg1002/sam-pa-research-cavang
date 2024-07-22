@@ -13,7 +13,7 @@ import json
 import sys
 #from tinysam import sam_model_registry, SamPredictor
 sys.path.append("D:\StableDiffusion\pa-sam")
-from model import sam_model_registry,SamPredictor
+from pa_sam_goc import sam_model_registry,SamPredictor
 import argparse
 
 def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_checkpoint_path):
@@ -27,7 +27,7 @@ def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_ch
         
     with open(vit_det_file_path) as f:
          res = json.load(f)
-    model_type = "vit_b"
+    model_type = "vit_l"
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     sam = sam_model_registry[model_type](checkpoint=sam_checkpoint_path)
@@ -59,7 +59,6 @@ def eval_zero_shot(eval_type,val_img_path,val_json_path,vit_det_file_path,sam_ch
             point_coords=None,
             point_labels=None,
             box=input_box[None, :],
-            hq_token_only=True,
             multimask_output = False,
         )
         
